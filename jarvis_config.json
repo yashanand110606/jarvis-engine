@@ -1,0 +1,13 @@
+{
+  "email": {
+    "address": "",
+    "password": ""
+  },
+  "ollama_model": "llama3",
+  "wake_word": "jarvis",
+  "offline_mode": false,
+  "personality": "jarvis",
+  "voice": "david",
+  "proactive_enabled": true,
+  "hud_enabled": true
+}

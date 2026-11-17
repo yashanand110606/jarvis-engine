@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>J.A.R.V.I.S.</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  color: #00ffff;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+#overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px;
+}
+.header { text-align: center; }
+.header h1 {
+  font-size: 48px;
+  letter-spacing: 20px;
+  text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
+  animation: pulse 2s infinite;
+}
+.status {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-top: 10px;
+  letter-spacing: 3px;
+}
+.left-panel, .right-panel {
+  width: 280px;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+.left-panel { align-self: flex-start; }
+.right-panel { align-self: flex-end; }
+.panel-title {
+  font-size: 12px;
+  letter-spacing: 3px;
+  margin-bottom: 15px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.data-value { color: #ffaa00; }
+.footer {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.5;
+  letter-spacing: 2px;
+}
+#voice-level {
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 255, 255, 0.2);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+#voice-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00ffff, #ffaa00);
+  transition: width 0.1s;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+#messages {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 600px;
+  text-align: center;
+  font-size: 18px;
+  color: #ffaa00;
+  text-shadow: 0 0 10px #ffaa00;
+  padding: 15px 25px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 170, 0, 0.5);
+  border-radius: 10px;
+  display: none;
+  animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+#cmd-input {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  color: #00ffff;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-size: 16px;
+  outline: none;
+  display: none;
+}
+#cmd-input::placeholder { color: rgba(0, 255, 255, 0.4); }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="overlay">
+  <div class="header">
+    <h1>J.A.R.V.I.S.</h1>
+    <div class="status" id="status">SYSTEM ONLINE • VOCAL MODULE ACTIVE</div>
+  </div>
+  <div class="left-panel">
+    <div class="panel-title">System Status</div>
+    <div class="data-row"><span>CPU</span><span class="data-value" id="cpu-val">--%</span></div>
+    <div class="data-row"><span>Memory</span><span class="data-value" id="mem-val">--%</span></div>
+    <div class="data-row"><span>Disk</span><span class="data-value" id="disk-val">--%</span></div>
+    <div class="data-row"><span>Uptime</span><span class="data-value" id="uptime">--</span></div>
+  </div>
+  <div class="right-panel">
+    <div class="panel-title">Active Commands</div>
+    <div class="data-row"><span>Voice</span><span class="data-value" id="voice-status">Standby</span></div>
+    <div class="data-row"><span>Wake Word</span><span class="data-value" id="wake-word">JARVIS</span></div>
+    <div class="data-row"><span>Persona</span><span class="data-value">JARVIS</span></div>
+    <div id="voice-level"><div id="voice-bar"></div></div>
+  </div>
+  <div class="footer">JUST A RATHER VERY INTELLIGENT SYSTEM • v2.0 PRODUCTION</div>
+</div>
+<div id="messages"></div>
+<input type="text" id="cmd-input" placeholder="Type command...">
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const API = 'http://localhost:8001';
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function drawGlowCircle(cx, cy, radius, color, lineWidth, glowSize) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.shadowBlur = glowSize;
+  ctx.shadowColor = color;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawHologram(cx, cy, time, voiceLevel) {
+  const baseRadius = Math.min(canvas.width, canvas.height) * 0.18;
+  for (let i = 0; i < 3; i++) {
+    const offset = (time * 0.001 * (i + 1)) % (Math.PI * 2);
+    const r = baseRadius * (1.1 + i * 0.15);
+    const alpha = 0.3 - i * 0.08;
+    drawGlowCircle(cx, cy, r, `rgba(0, 255, 255, ${alpha})`, 1, 10);
+    const segLength = Math.PI / 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, offset, offset + segLength);
+    ctx.strokeStyle = `rgba(0, 255, 255, ${alpha + 0.2})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  const coreRadius = baseRadius * 0.5;
+  const pulseR = coreRadius + voiceLevel * 20;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseR);
+  grad.addColorStop(0, `rgba(0, 255, 255, ${0.1 + voiceLevel * 0.3})`);
+  grad.addColorStop(0.7, `rgba(0, 200, 255, ${0.05 + voiceLevel * 0.1})`);
+  grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+  ctx.fill();
+  drawGlowCircle(cx, cy, coreRadius, `rgba(255, 170, 0, ${0.5 + voiceLevel * 0.5})`, 2, 20);
+  for (let i = 0; i < 6; i++) {
+    const angle = (time * 0.002) + (i * Math.PI / 3);
+    const startR = coreRadius * 0.3;
+    const endR = coreRadius + 30 + voiceLevel * 15;
+    ctx.beginPath();
+    ctx.moveTo(cx + startR * Math.cos(angle), cy + startR * Math.sin(angle));
+    ctx.lineTo(cx + endR * Math.cos(angle), cy + endR * Math.sin(angle));
+    ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + voiceLevel * 0.4})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  if (voiceLevel > 0.1) {
+    const eyeRadius = 15 + voiceLevel * 25;
+    ctx.beginPath();
+    ctx.arc(cx, cy, eyeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 170, 0, ${voiceLevel * 0.8})`;
+    ctx.fill();
+  }
+}
+
+let time = 0;
+let voiceLevel = 0;
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  time++;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2 - 50;
+  drawHologram(cx, cy, time, voiceLevel);
+  if (voiceLevel > 0) voiceLevel *= 0.95;
+  document.getElementById('voice-bar').style.width = (voiceLevel * 100) + '%';
+  document.getElementById('voice-status').textContent = voiceLevel > 0.1 ? 'Listening' : 'Standby';
+  requestAnimationFrame(animate);
+}
+animate();
+
+function updateSystemStats() {
+  fetch(API + '/api/system')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('cpu-val').textContent = data.cpu + '%';
+      document.getElementById('mem-val').textContent = data.mem + '%';
+      document.getElementById('disk-val').textContent = data.disk + '%';
+      document.getElementById('uptime').textContent = data.uptime;
+    })
+    .catch(() => {});
+}
+
+setInterval(updateSystemStats, 2000);
+updateSystemStats();
+
+const msgEl = document.getElementById('messages');
+let msgTimeout;
+
+function showHUDMessage(text) {
+  msgEl.textContent = text;
+  msgEl.style.display = 'block';
+  clearTimeout(msgTimeout);
+  msgTimeout = setTimeout(() => {
+    msgEl.style.display = 'none';
+  }, 4000);
+}
+
+setInterval(() => {
+  fetch(API + '/api/hud/update')
+    .then(r => r.json())
+    .then(data => {
+      if (data.message) showHUDMessage(data.message);
+    })
+    .catch(() => {});
+}, 500);
+
+const cmdInput = document.getElementById('cmd-input');
+cmdInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && cmdInput.value.trim()) {
+    fetch(API + '/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmdInput.value })
+    }).then(r => r.json()).then(d => {
+      if (d.message) showHUDMessage(d.message);
+    });
+    cmdInput.value = '';
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '`' || e.key === '~') {
+    cmdInput.style.display = cmdInput.style.display === 'block' ? 'none' : 'block';
+    cmdInput.focus();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# JARVIS dependencies
+# Install: pip install -r requirements.txt
+
+# Voice
+speech_recognition
+pyaudio
+pyttsx3
+
+# LLM
+ollama
+
+# Search
+ddgs
+
+# System control
+pyautogui
+psutil
+
+# Google APIs (optional: calendar, gmail oauth)
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
